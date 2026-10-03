@@ -422,7 +422,7 @@
                 const ctx = canvas.getContext('2d');
                 ctx.globalCompositeOperation = 'source-over';
                 if (onSave) {
-                    onSave(canvas.toDataURL('image/jpeg', 0.6'));
+                    onSave(canvas.toDataURL('image/jpeg', 0.6));
                 }
             };
 
@@ -431,7 +431,7 @@
                 if (onClear) onClear();
                 if (onSave) {
                     const canvas = canvasRef.current;
-                    onSave(canvas.toDataURL('image/jpeg', 0.6'));
+                    onSave(canvas.toDataURL('image/jpeg', 0.6));
                 }
             };
 
@@ -447,7 +447,7 @@
                         redrawCanvas(img);
                         if (onSave) {
                             setTimeout(() => {
-                                onSave(canvasRef.current.toDataURL('image/jpeg', 0.6'));
+                                onSave(canvasRef.current.toDataURL('image/jpeg', 0.6));
                             }, 100);
                         }
                     };
