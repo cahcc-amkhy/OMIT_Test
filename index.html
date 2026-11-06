@@ -328,209 +328,246 @@
             return { title, totalScore, questions };
         };
 
-        // Item 1 & 21: High-precision Interactive Canvas (1280x720 internal coordinates mapping)
-        const WhiteboardCanvas = ({ initialBg, onSave, disabled, strokeWidth = 4, setStrokeWidth, isEraser, setIsEraser, currentColor, setCurrentColor, onClear, onUploadBg }) => {
-            const canvasRef = useRef(null);
-            const [isDrawing, setIsDrawing] = useState(false);
-            const [bgImageObj, setBgImageObj] = useState(null);
+        // Item 1 & 21: High-precision Interactive Canvas with Dual-Layer Eraser Fix
+    const WhiteboardCanvas = ({ initialBg, onSave, disabled, strokeWidth = 4, setStrokeWidth, isEraser, setIsEraser, currentColor, setCurrentColor, onClear, onUploadBg }) => {
+        const bgCanvasRef = useRef(null);
+        const drawCanvasRef = useRef(null);
+        const [isDrawing, setIsDrawing] = useState(false);
+        const [bgImageObj, setBgImageObj] = useState(null);
 
-            useEffect(() => {
-                if (initialBg) {
-                    const img = new Image();
-                    img.onload = () => {
-                        setBgImageObj(img);
-                        redrawCanvas(img);
-                    };
-                    img.src = initialBg;
-                } else {
-                    setBgImageObj(null);
-                    redrawCanvas(null);
-                }
-            }, [initialBg]);
-
-            const redrawCanvas = (bgImg) => {
-                const canvas = canvasRef.current;
-                if (!canvas) return;
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                if (bgImg) {
-                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-                } else {
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                }
-            };
-
-            const getCanvasPos = (e) => {
-                const canvas = canvasRef.current;
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-
-                let clientX = e.clientX;
-                let clientY = e.clientY;
-
-                if (e.touches && e.touches.length > 0) {
-                    clientX = e.touches[0].clientX;
-                    clientY = e.touches[0].clientY;
-                }
-
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
+        // 載入背景圖片或重置背景層
+        useEffect(() => {
+            if (initialBg) {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    setBgImageObj(img);
+                    drawBackgroundLayer(img);
                 };
-            };
+                img.src = initialBg;
+            } else {
+                setBgImageObj(null);
+                drawBackgroundLayer(null);
+            }
+        }, [initialBg]);
 
-            const startDrawing = (e) => {
-                if (disabled) return;
-                e.preventDefault();
-                setIsDrawing(true);
-                const pos = getCanvasPos(e);
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
-            };
-
-            const draw = (e) => {
-                if (!isDrawing || disabled) return;
-                e.preventDefault();
-                const pos = getCanvasPos(e);
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-
-                ctx.lineWidth = strokeWidth;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-
-                if (isEraser) {
-                    ctx.globalCompositeOperation = 'destination-out';
-                } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.strokeStyle = currentColor || '#2563eb';
-                }
-
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
-            };
-
-            const stopDrawing = () => {
-                if (!isDrawing) return;
-                setIsDrawing(false);
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                ctx.globalCompositeOperation = 'source-over';
-                if (onSave) {
-                    onSave(canvas.toDataURL('image/jpeg', 0.6));
-                }
-            };
-
-            const handleLocalClear = () => {
-                redrawCanvas(bgImageObj);
-                if (onClear) onClear();
-                if (onSave) {
-                    const canvas = canvasRef.current;
-                    onSave(canvas.toDataURL('image/jpeg', 0.6));
-                }
-            };
-
-            const handleBgUploadChange = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const imgData = evt.target.result;
-                    const img = new Image();
-                    img.onload = () => {
-                        setBgImageObj(img);
-                        redrawCanvas(img);
-                        if (onSave) {
-                            setTimeout(() => {
-                                onSave(canvasRef.current.toDataURL('image/jpeg', 0.6));
-                            }, 100);
-                        }
-                    };
-                    img.src = imgData;
-                    if (onUploadBg) onUploadBg(imgData);
-                };
-                reader.readAsDataURL(file);
-            };
-
-            return (
-                <div class="space-y-3">
-                    <div class="canvas-container relative w-full aspect-16-9 bg-white rounded-2xl overflow-hidden border-2 border-indigo-200 shadow-inner">
-                        <canvas
-                            ref={canvasRef}
-                            width={1280}
-                            height={720}
-                            onMouseDown={startDrawing}
-                            onMouseMove={draw}
-                            onMouseUp={stopDrawing}
-                            onMouseLeave={stopDrawing}
-                            onTouchStart={startDrawing}
-                            onTouchMove={draw}
-                            onTouchEnd={stopDrawing}
-                            class="w-full h-full cursor-crosshair touch-none"
-                        />
-                    </div>
-
-                    {!disabled && (
-                        <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-100 p-3 rounded-2xl border">
-                            {/* Colors */}
-                            <div class="flex items-center space-x-1.5 overflow-x-auto py-1">
-                                <span class="text-xs font-bold text-slate-600 mr-1">顏色:</span>
-                                {PRESET_COLORS.map((c) => (
-                                    <button
-                                        key={c.value}
-                                        type="button"
-                                        onClick={() => { setCurrentColor(c.value); setIsEraser(false); }}
-                                        class={`w-7 h-7 rounded-full border-2 transition ${currentColor === c.value && !isEraser ? 'scale-110 border-slate-900 ring-2 ring-indigo-400' : 'border-white'}`}
-                                        style={{ backgroundColor: c.value }}
-                                        title={c.name}
-                                    />
-                                ))}
-                            </div>
-
-                            {/* Stroke Width Slider */}
-                            <div class="flex items-center space-x-2">
-                                <span class="text-xs font-bold text-slate-600">粗細 ({strokeWidth}px):</span>
-                                <input 
-                                    type="range" 
-                                    min="2" 
-                                    max="18" 
-                                    value={strokeWidth} 
-                                    onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
-                                    class="w-20 accent-indigo-600 cursor-pointer"
-                                />
-                            </div>
-
-                            {/* Controls */}
-                            <div class="flex items-center space-x-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEraser(!isEraser)}
-                                    class={`px-3 py-1.5 text-xs font-bold rounded-xl border transition ${isEraser ? 'bg-amber-500 text-white border-amber-600 shadow' : 'bg-white text-slate-700 border-slate-300'}`}
-                                >
-                                    🧽 擦膠 {isEraser ? '(開啟中)' : ''}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleLocalClear}
-                                    class="px-3 py-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200 transition"
-                                >
-                                    🗑️ 清空
-                                </button>
-                                <label class="px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl border border-indigo-200 cursor-pointer transition">
-                                    🖼️ 上載背景
-                                    <input type="file" accept="image/*" onChange={handleBgUploadChange} class="hidden" />
-                                </label>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
+        // 繪製底層背景 Canvas
+        const drawBackgroundLayer = (bgImg) => {
+            const bgCanvas = bgCanvasRef.current;
+            if (!bgCanvas) return;
+            const ctx = bgCanvas.getContext('2d');
+            ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            if (bgImg) {
+                ctx.drawImage(bgImg, 0, 0, bgCanvas.width, bgCanvas.height);
+            } else {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            }
         };
+
+        // 計算精確鼠標/觸控座標
+        const getCanvasPos = (e) => {
+            const canvas = drawCanvasRef.current;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        };
+
+        // 合成背景層與筆畫層，用於保存/導出圖片
+        const getExportDataURL = () => {
+            const bgCanvas = bgCanvasRef.current;
+            const drawCanvas = drawCanvasRef.current;
+            if (!bgCanvas || !drawCanvas) return null;
+
+            const offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = bgCanvas.width;
+            offscreenCanvas.height = bgCanvas.height;
+            const ctx = offscreenCanvas.getContext('2d');
+
+            // 1. 先畫背景
+            ctx.drawImage(bgCanvas, 0, 0);
+            // 2. 疊加手寫筆畫
+            ctx.drawImage(drawCanvas, 0, 0);
+
+            return offscreenCanvas.toDataURL('image/jpeg', 0.6);
+        };
+
+        const startDrawing = (e) => {
+            if (disabled) return;
+            e.preventDefault();
+            setIsDrawing(true);
+            const pos = getCanvasPos(e);
+            const canvas = drawCanvasRef.current;
+            const ctx = canvas.getContext('2d');
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        };
+
+        const draw = (e) => {
+            if (!isDrawing || disabled) return;
+            e.preventDefault();
+            const pos = getCanvasPos(e);
+            const canvas = drawCanvasRef.current;
+            const ctx = canvas.getContext('2d');
+
+            ctx.lineWidth = isEraser ? strokeWidth * 2 : strokeWidth; // 擦膠適當加大範圍
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (isEraser) {
+                // 只擦除繪圖層的筆蹟，完全不影響背景 Canvas
+                ctx.globalCompositeOperation = 'destination-out';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.strokeStyle = currentColor || '#2563eb';
+            }
+
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        };
+
+        const stopDrawing = () => {
+            if (!isDrawing) return;
+            setIsDrawing(false);
+            const canvas = drawCanvasRef.current;
+            const ctx = canvas.getContext('2d');
+            ctx.globalCompositeOperation = 'source-over';
+
+            if (onSave) {
+                onSave(getExportDataURL());
+            }
+        };
+
+        const handleLocalClear = () => {
+            const drawCanvas = drawCanvasRef.current;
+            if (drawCanvas) {
+                const ctx = drawCanvas.getContext('2d');
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            }
+            if (onClear) onClear();
+            if (onSave) {
+                onSave(getExportDataURL());
+            }
+        };
+
+        const handleBgUploadChange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const imgData = evt.target.result;
+                const img = new Image();
+                img.onload = () => {
+                    setBgImageObj(img);
+                    drawBackgroundLayer(img);
+                    if (onSave) {
+                        setTimeout(() => {
+                            onSave(getExportDataURL());
+                        }, 100);
+                    }
+                };
+                img.src = imgData;
+                if (onUploadBg) onUploadBg(imgData);
+            };
+            reader.readAsDataURL(file);
+        };
+
+        return (
+            <div class="space-y-3">
+                <div class="canvas-container relative w-full aspect-16-9 bg-white rounded-2xl overflow-hidden border-2 border-indigo-200 shadow-inner">
+                    {/* 底層 Canvas: 專門放背景圖片 */}
+                    <canvas
+                        ref={bgCanvasRef}
+                        width={1280}
+                        height={720}
+                        class="absolute inset-0 w-full h-full pointer-events-none"
+                    />
+                    {/* 頂層 Canvas: 專門放手畫筆跡 (擦膠只擦這層) */}
+                    <canvas
+                        ref={drawCanvasRef}
+                        width={1280}
+                        height={720}
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing}
+                        onTouchMove={draw}
+                        onTouchEnd={stopDrawing}
+                        class="absolute inset-0 w-full h-full cursor-crosshair touch-none"
+                    />
+                </div>
+
+                {!disabled && (
+                    <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-100 p-3 rounded-2xl border">
+                        {/* Colors */}
+                        <div class="flex items-center space-x-1.5 overflow-x-auto py-1">
+                            <span class="text-xs font-bold text-slate-600 mr-1">顏色:</span>
+                            {PRESET_COLORS.map((c) => (
+                                <button
+                                    key={c.value}
+                                    type="button"
+                                    onClick={() => { setCurrentColor(c.value); setIsEraser(false); }}
+                                    class={`w-7 h-7 rounded-full border-2 transition ${currentColor === c.value && !isEraser ? 'scale-110 border-slate-900 ring-2 ring-indigo-400' : 'border-white'}`}
+                                    style={{ backgroundColor: c.value }}
+                                    title={c.name}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Stroke Width Slider */}
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold text-slate-600">粗細 ({strokeWidth}px):</span>
+                            <input 
+                                type="range" 
+                                min="2" 
+                                max="18" 
+                                value={strokeWidth} 
+                                onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
+                                class="w-20 accent-indigo-600 cursor-pointer"
+                            />
+                        </div>
+
+                        {/* Controls */}
+                        <div class="flex items-center space-x-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsEraser(!isEraser)}
+                                class={`px-3 py-1.5 text-xs font-bold rounded-xl border transition ${isEraser ? 'bg-amber-500 text-white border-amber-600 shadow' : 'bg-white text-slate-700 border-slate-300'}`}
+                            >
+                                🧽 擦膠 {isEraser ? '(開啟中)' : ''}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleLocalClear}
+                                class="px-3 py-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200 transition"
+                            >
+                                🗑️ 清空筆跡
+                            </button>
+                            <label class="px-3 py-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl border border-indigo-200 cursor-pointer transition">
+                                🖼️ 上載背景
+                                <input type="file" accept="image/*" onChange={handleBgUploadChange} class="hidden" />
+                            </label>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
         function OMITApp() {
             const [role, setRole] = useState('LANDING'); // 'LANDING', 'TEACHER', 'STUDENT'
